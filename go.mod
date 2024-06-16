@@ -1,6 +1,6 @@
 module github.com/xhd2015/archive-man
 
-go 1.22
+go 1.18
 
 require (
 	github.com/evanoberholster/imagemeta v0.3.1

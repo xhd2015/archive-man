@@ -5,7 +5,7 @@ Library and command line tools used to manage archived photos, documents and oth
 Install CLI:
 
 ```sh
-go get github.com/xhd2015/archive-man/cmd/archive-man@latest
+go install github.com/xhd2015/archive-man/cmd/archive-man@latest
 ```
 
 # Command line usage
