@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // copy files
@@ -53,6 +54,9 @@ func handle(args []string) error {
 
 	if cmd == "inspect" {
 		return inspect(args)
+	}
+	if cmd == "delete-file" || cmd == "delete-files" {
+		return deleteFiles(args)
 	}
 
 	if true {
@@ -226,26 +230,54 @@ func copyFile(src string, dst string) error {
 	}
 	defer dstFile.Close()
 	_, err = io.Copy(dstFile, srcFile)
-	return err
+	if err != nil {
+		return err
+	}
+	srcStat, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	modTime := srcStat.ModTime()
+	return os.Chtimes(dst, time.Time{}, modTime)
 }
 
 func inspect(args []string) error {
+	return manageDir(manageCommand_Inspect, args)
+}
+
+func deleteFiles(args []string) error {
+	return manageDir(manageCommand_DeleteFiles, args)
+}
+
+type manageCommand int
+
+const (
+	manageCommand_Inspect     manageCommand = 0
+	manageCommand_DeleteFiles manageCommand = 1
+)
+
+func manageDir(cmd manageCommand, args []string) error {
 	var limit int
 	var count bool
 
-	var delete bool
+	var dryRun bool
+
 	n := len(args)
 	var remainArgs []string
 	var prefixes []string
 	for i := 0; i < n; i++ {
 		arg := args[i]
-		if arg == "--count" {
-			count = true
-			continue
+		if cmd == manageCommand_Inspect {
+			if arg == "--count" {
+				count = true
+				continue
+			}
 		}
-		if arg == "--delete" {
-			delete = true
-			continue
+		if cmd == manageCommand_DeleteFiles {
+			if arg == "--dry-run" {
+				dryRun = true
+				continue
+			}
 		}
 		if arg == "--prefix" {
 			if i >= n {
@@ -275,8 +307,9 @@ func inspect(args []string) error {
 	}
 	// sync src dst
 	if len(remainArgs) < 1 {
-		return fmt.Errorf("usage: inspect DIR")
+		return fmt.Errorf("requires DIR")
 	}
+	delete := cmd == manageCommand_DeleteFiles
 	dir := remainArgs[0]
 
 	var total int
@@ -304,7 +337,10 @@ func inspect(args []string) error {
 			if d.IsDir() {
 				return nil
 			}
-			fmt.Printf("rm %s\n", relPath)
+			if dryRun {
+				fmt.Printf("rm %s\n", relPath)
+				return nil
+			}
 			return os.RemoveAll(path)
 		} else if !count {
 			fmt.Printf("%s\n", relPath)
@@ -314,7 +350,13 @@ func inspect(args []string) error {
 	if err != nil {
 		return err
 	}
-	if count {
+	if delete {
+		if dryRun {
+			fmt.Printf("will delete: %d\n", total)
+		} else {
+			fmt.Printf("deleted: %d\n", total)
+		}
+	} else if count {
 		fmt.Printf("%d\n", total)
 	}
 	return nil
